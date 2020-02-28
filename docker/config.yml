@@ -1,0 +1,4 @@
+filestore.backend: 'filesystem'
+filestore.options:
+  location: '/data/files'
+dsym.cache-path: '/data/dsym-cache'

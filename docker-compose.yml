@@ -1,0 +1,84 @@
+version: '3.4'
+
+x-sentry-defaults: &sentry_defaults
+  image: "lemix/sentry-swarm:9.1.2"
+  environment:
+    - SENTRY_DB_HOST={{ index .Service.Labels "com.docker.stack.namespace" }}_db.sentry-services # stack_name_service_name.network_name
+    - SENTRY_DB_NAME=sentry
+    - SENTRY_DB_USER=sentry
+    - SENTRY_DB_PASSWORD=sentry
+    - SENTRY_REDIS_HOST={{ index .Service.Labels "com.docker.stack.namespace" }}_redis.sentry-services # stack_name_service_name.network_name
+    - SENTRY_REDIS_DB=0
+    - SENTRY_SECRET_KEY=SpT+ZGNVPYQG^(M(Mm2zw.Elaah68cy<qBBW4HbM2G=cF4UML # you must change secret key
+    - SENTRY_STACK_NAME={{ index .Service.Labels "com.docker.stack.namespace" }}
+    - SENTRY_USE_SSL=False
+    - SENTRY_EMAIL_HOST=
+    - SENTRY_EMAIL_PORT=
+    - SENTRY_EMAIL_USER=
+    - SENTRY_EMAIL_PASSWORD=
+    - SENTRY_EMAIL_USE_TLS=
+    - SENTRY_EMAIL_LIST_NAMESPACE=
+    - INSTALL_ORG=MyOrg
+    - INSTALL_USERNAME=sentry
+    - INSTALL_USER_EMAIL=sentry@example.com
+    - INSTALL_USER_PASSWORD=sentry
+  volumes:
+    - sentry-data:/data
+  networks:
+    - sentry-services
+
+x-service-deploy: &service_deploy
+  deploy:
+    replicas: 1
+    update_config:
+      parallelism: 1
+      delay: 1s
+      order: stop-first
+      failure_action: rollback
+
+services:
+  web:
+    << : *sentry_defaults
+    << : *service_deploy
+    ports:
+      - 9000:9000
+  cron:
+    << : *sentry_defaults
+    << : *service_deploy
+    command: run cron
+  worker:
+    << : *sentry_defaults
+    << : *service_deploy
+    command: run worker
+  db:
+    << : *service_deploy
+    image: postgres:9.6
+    volumes:
+      - sentry-pg:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: sentry
+      POSTGRES_PASSWORD: sentry
+      POSTGRES_DB: sentry
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - sentry-services
+  redis:
+    << : *service_deploy
+    image: redis:5.0-alpine
+    volumes:
+      - sentry-redis:/data
+    networks:
+      - sentry-services
+
+networks:
+  sentry-services:
+    external: true
+
+volumes:
+  sentry-data:
+    external: true
+  sentry-pg:
+    external: true
+  sentry-redis:
+    external: true
+
